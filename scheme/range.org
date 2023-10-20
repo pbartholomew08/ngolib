@@ -1,0 +1,183 @@
+#+TITLE: Range
+
+Implements the ~range~ function: given a ~start~, ~stop~ and a ~step~ returns the list of all numbers from
+~start~ below ~stop~, incrementing by ~step~.
+
+The ~iota~ function of ~srfi-1~ returns a list of ~count~ elements, starting from ~start~ and incrementing
+by ~step~.
+This is almost the functionality required by ~range~, ~count~ must be determined from the ~start~, ~stop~
+and ~step~ arguments.
+
+#+CAPTION: The ~range~ function.
+#+NAME: range.scm
+#+begin_src scheme
+  (use-modules (srfi srfi-1))
+
+  (define (range start stop step)
+    "Function that returns the list of numbers from start below stop, incrementing by step."
+    (define (count)
+      "Get the count of steps from start below stop."
+      (let ((delta (- stop start)))
+        (if (> (* delta step) 0)
+            (floor (/ delta step))
+            0)))
+    (iota (count) start step))
+#+end_src
+
+#+CAPTION: The ~ngo range~ module.
+#+begin_src scheme :noweb no-export :tangle range.scm
+  (define-module (ngo range)
+    #:export (range))
+
+  <<range.scm>>
+#+end_src
+
+* Tests
+
+The test program in listing\nbsp[[test:range.scm]] consists of several test suites to check properties of
+the ~range~ function, detailed below.
+
+#+CAPTION: The ~range~ test program.
+#+NAME: test:range.scm
+#+begin_src scheme :noweb no-export :tangle test-range.scm
+  (use-modules (srfi srfi-64)) ; Load unit-testing SRFI
+  (use-modules (ngo range))    ; Load the range module
+
+  <<valid-input.scm>>
+
+  <<test:start-eq-stop.scm>>
+  <<test:start-ne-stop.scm>>
+  <<test:invalid.scm>>
+#+end_src
+
+** ~start == stop~
+
+When the ~start~ and ~stop~ are equal ~range~ should return an empty list.
+The ~start-eq-stop~ test suite in listing\nbsp[[test:start-eq-stop.scm]] checks this condition for likely edge
+cases (~start=stop=0~, ~start=stop=1~ and ~start=stop=-1~; ~step=0,1,-1~).
+
+#+CAPTION: Test suite for calling ~range~ with equal ~sart~ and ~stop~ arguments returns the empty list.
+#+NAME: test:start-eq-stop.scm
+#+begin_src scheme
+  (test-begin "start-eq-stop")
+
+  (define (test-util:start==stop start step)
+    "Utility function to check range returns empty list when start=stop."
+    (null? (range start start step)))
+
+  (test-assert "0 0" (test-util:start==stop 0 0))
+  (test-assert "0 1" (test-util:start==stop 0 1))
+  (test-assert "0 -1" (test-util:start==stop 0 -1))
+
+  (test-assert "1 0" (test-util:start==stop 1 0))
+  (test-assert "1 1" (test-util:start==stop 1 1))
+  (test-assert "1 -1" (test-util:start==stop 1 -1))
+
+  (test-assert "-1 0" (test-util:start==stop -1 0))
+  (test-assert "-1 1" (test-util:start==stop -1 1))
+  (test-assert "-1 -1" (test-util:start==stop -1 -1))
+
+  (test-end "start-eq-stop")
+#+end_src
+
+** ~start /= stop~
+
+When the ~start~ and ~stop~ are not equal ~range~ should return a non-empty list.
+This test suite doesn't check the validity of the list, only that it is non-empty.
+
+#+CAPTION: Test suite calling ~range~ with unequal ~start~ and ~stop~ arguments should return a non-empty list.
+#+NAME: test:start-ne-stop.scm
+#+begin_src scheme
+  (test-begin "start-ne-stop")
+
+  (define (test-util:start/=stop start stop step)
+    "Utility function to check range returns non-empty list when start/=stop, i.e. for a valid input."
+    (and (valid-input? start stop step) ; Ensure test condition is met.
+         (not (null? (range start stop step)))))
+
+  (test-assert "0 1 +" (test-util:start/=stop 0 1 1))
+  (test-assert "0 -1 -" (test-util:start/=stop 0 -1 -1))
+
+  (test-assert "1 0 -" (test-util:start/=stop 1 0 -1))
+  (test-assert "1 -1 -" (test-util:start/=stop 1 -1 -1))
+  (test-assert "1 2 -" (test-util:start/=stop 1 2 1))
+
+  (test-assert "-1 0 +" (test-util:start/=stop -1 0 1))
+  (test-assert "-1 1 +" (test-util:start/=stop -1 1 1))
+  (test-assert "-1 -2 -" (test-util:start/=stop -1 -2 -1))
+
+  (test-end "start-ne-stop")
+#+end_src
+
+** Invalid ~step~ / ~start-stop~ combination
+
+When the ~start/stop~ and ~step~ combination is invalid (see\nbsp[[valid-input.scm]]) the ~range~ function returns
+the empty list.
+
+#+CAPTION: Test suite calling ~range~ with invalid inputs.
+#+NAME: test:invalid.scm
+#+begin_src scheme
+  (test-begin "invalid")
+
+  (define (test-util:invalid start stop step)
+    "Utility function to check range resturns empty list when given invalid inputs."
+    (and (not (valid-input? start stop step)) ; Test fails if input is *not* invalid.
+         (null? (range start stop step))))
+
+  (test-assert "0 1 -" (test-util:invalid 0 1 -1))
+  (test-assert "0 -1 +" (test-util:invalid 0 -1 1))
+  (test-assert "0 1 0" (test-util:invalid 0 1 0))
+  (test-assert "0 -1 0" (test-util:invalid 0 -1 0))
+
+  (test-assert "1 0 +" (test-util:invalid 1 0 1))
+  (test-assert "1 -1 +" (test-util:invalid 1 -1 1))
+  (test-assert "1 2 -" (test-util:invalid 1 2 -1))
+  (test-assert "1 0 0" (test-util:invalid 1 0 0))
+  (test-assert "1 -1 0" (test-util:invalid 1 -1 0))
+  (test-assert "1 2 0" (test-util:invalid 1 2 -0))
+
+  (test-assert "-1 0 -" (test-util:invalid -1 0 -1))
+  (test-assert "-1 1 -" (test-util:invalid -1 1 -1))
+  (test-assert "-1 -2 +" (test-util:invalid -1 -2 1))
+  (test-assert "-1 0 0" (test-util:invalid -1 0 0))
+  (test-assert "-1 1 0" (test-util:invalid -1 1 0))
+  (test-assert "-1 -2 0" (test-util:invalid -1 -2 0))
+
+  (test-end "invalid")
+#+end_src
+
+** Start
+
+For a valid input the returned list should start at the given ~start~ value.
+
+** Stop
+
+For a valid input the returned list should stop at the entry satisfying $x_{i}+\Delta{}\ge{}X$ where
+$x_i$ is the final element, $\Delta$ is the ~step~ and $X$ is the ~stop~ value.
+
+** Step
+
+In the returned list from ~range~ each element should differ from the previous by ~step~, /i.e./
+\begin{equation}
+  x_{i+1}=x_{i}+\Delta\forall{}i>1
+\end{equation}
+
+** Test utilities
+
+This section collects utility functions that are non-specific to a given test.
+
+The ~step~ must allow ~range~ to get from ~start~ to ~stop~.
+Therefore a zero ~step~ is invalid, as is a ~step~ with a different sign than the difference ~(- stop
+start)~, a valid ~start/stop/step~ combination satisfies the condition tested by ~valid-input?~
+in\nbsp[[valid-input.scm]].
+
+#+CAPTION: Function testing validity of input to ~range~.
+#+NAME: valid-input.scm
+#+begin_src scheme
+  (define (valid-input? start stop step)
+    "Check that input to range is valid."
+    (> (* (- stop start)
+          step)
+       0))
+#+end_src
+
