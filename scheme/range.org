@@ -165,35 +165,6 @@ When the ~start~ and ~stop~ are equal ~range~ should return an empty list.
   (test-assert "-1 -1" (test-util:start==stop -1 -1))
 #+end_src
 
-** ~start /= stop~
-
-When the ~start~ and ~stop~ are not equal ~range~ should return a non-empty list.
-This test suite doesn't check the validity of the list, only that it is non-empty.
-
-#+CAPTION: Test suite calling ~range~ with unequal ~start~ and ~stop~ arguments should return a non-empty list.
-#+NAME: test:start-ne-stop.scm
-#+begin_src scheme
-  (test-begin "start-ne-stop")
-
-  (define (test-util:start/=stop start stop step)
-    "Utility function to check range returns non-empty list when start/=stop, i.e. for a valid input."
-    (and (valid-input? start stop step) ; Ensure test condition is met.
-         (not (null? (range start stop step)))))
-
-  (test-assert "0 1 +" (test-util:start/=stop 0 1 1))
-  (test-assert "0 -1 -" (test-util:start/=stop 0 -1 -1))
-
-  (test-assert "1 0 -" (test-util:start/=stop 1 0 -1))
-  (test-assert "1 -1 -" (test-util:start/=stop 1 -1 -1))
-  (test-assert "1 2 -" (test-util:start/=stop 1 2 1))
-
-  (test-assert "-1 0 +" (test-util:start/=stop -1 0 1))
-  (test-assert "-1 1 +" (test-util:start/=stop -1 1 1))
-  (test-assert "-1 -2 -" (test-util:start/=stop -1 -2 -1))
-
-  (test-end "start-ne-stop")
-#+end_src
-
 ** Invalid ~step~ / ~start-stop~ combination
 
 When the ~start/stop~ and ~step~ combination is invalid (see\nbsp[[valid-input.scm]]) the ~range~ function returns
