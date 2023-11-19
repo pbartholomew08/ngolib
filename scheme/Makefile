@@ -15,14 +15,13 @@ all: build
 
 build: $(TGT)
 
-tangle:
-	emacs --batch --eval "(require 'org)" --eval '(org-babel-tangle-file "range.org")'
-
 $(TGT): range.scm
 	guild compile $< -o $@
 
-%.scm: range.org
-	$(MAKE) tangle
+$(GUILE_SITE_DIR)/ngo/%.go: %.scm
+
+%.scm: %.org
+	emacs --batch --eval "(require 'org)" --eval '(org-babel-tangle-file "$^")'
 
 .PHONY: tests
 test: all
