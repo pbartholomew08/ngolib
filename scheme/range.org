@@ -1,12 +1,14 @@
 #+TITLE: Range
 
-Implements the ~range~ function: given a ~start~, ~stop~ and a ~step~ returns the list of all numbers from
-~start~ below ~stop~, incrementing by ~step~.
+Implements the ~range~ function returning the list of numbers from ~start~ until, but excluding, ~stop~
+in increments of ~step~.
 
-The ~iota~ function of ~srfi-1~ returns a list of ~count~ elements, starting from ~start~ and incrementing
-by ~step~.
-This is almost the functionality required by ~range~, ~count~ must be determined from the ~start~, ~stop~
-and ~step~ arguments.
+The ~(iota count start step)~ function of ~srfi-1~ returns a list of ~count~ elements, starting from ~start~
+and incrementing by ~step~.
+This is essentially the functionality of the ~range~ function, however rather than a ~count~ we are
+given the value we must ~stop~ before.
+The implementation of ~range~ in listing\nbsp[[range.scm]] uses ~iota~ to compute this list, with a ~count~
+determined by the supplied ~start~, ~stop~ and ~step~ arguments.
 
 #+CAPTION: The ~range~ function.
 #+NAME: range.scm
@@ -14,14 +16,39 @@ and ~step~ arguments.
   (use-modules (srfi srfi-1))
 
   (define (range start stop step)
-    "Function that returns the list of numbers from start below stop, incrementing by step."
-    (define (count)
-      "Get the count of steps from start below stop."
-      (let ((delta (- stop start)))
-        (if (> (* delta step) 0)
-            (floor (/ delta step))
-            0)))
-    (iota (count) start step))
+    "Function that returns the list of numbers between start and stop when incremented by step."
+    (iota (count start stop step)
+          start
+          step))
+#+end_src
+
+Listing\nbsp[[count.scm]] implements a ~count~ function which will return the number of steps /if/ it is
+possible to get to ~stop~ from ~start~ with an increment of ~step~.
+
+#+CAPTION: The ~count~ function.
+#+NAME: count.scm
+#+begin_src scheme
+  (define (count start stop step)
+    "Get the count of steps from start to stop."
+    (if (and (reachable? start stop step)
+             (> step 0))
+        (floor (/ (- stop start)
+                  step))
+        0))
+#+end_src
+
+The ~reachable?~ predicate implemented in listing\nbsp[[reachable.scm]] determines whether the combination of
+~start~, ~stop~ and ~step~ is valid: a positive, finite number of ~step~'s will eventually reach ~stop~ from
+~start~.
+
+#+CAPTION: The ~reachable?~ predicate.
+#+NAME: reachable.scm
+#+begin_src scheme
+  (define (reachable? start stop step)
+    "Is stop reachable from start using step?"
+    (>= (* (- stop start)
+           step)
+        0))
 #+end_src
 
 #+CAPTION: The ~ngo range~ module.
@@ -29,6 +56,8 @@ and ~step~ arguments.
   (define-module (ngo range)
     #:export (range))
 
+  <<reachable.scm>>
+  <<count.scm>>
   <<range.scm>>
 #+end_src
 
@@ -52,15 +81,73 @@ the ~range~ function, detailed below.
 
 ** ~start == stop~
 
-When the ~start~ and ~stop~ are equal ~range~ should return an empty list.
-The ~start-eq-stop~ test suite in listing\nbsp[[test:start-eq-stop.scm]] checks this condition for likely edge
-cases (~start=stop=0~, ~start=stop=1~ and ~start=stop=-1~; ~step=0,1,-1~).
+This test suite considers the case when calling ~range~ with equal ~start~ and ~stop~ values.
 
-#+CAPTION: Test suite for calling ~range~ with equal ~sart~ and ~stop~ arguments returns the empty list.
+#+CAPTION: Test suite for calling ~range~ with equal ~start~ and ~stop~ arguments returns the empty list.
 #+NAME: test:start-eq-stop.scm
-#+begin_src scheme
+#+begin_src scheme :noweb no-export
   (test-begin "start-eq-stop")
 
+  <<test:start-eq-stop:reachable?.scm>>
+  <<test:start-eq-stop:count.scm>>
+  <<test:start-eq-stop:range.scm>>
+
+  (test-end "start-eq-stop")
+#+end_src
+
+*** reachable?
+
+When the ~start~ and ~stop~ are equal ~reachable?~ should return ~#t~ as we have reached the ~stop~ already!
+
+#+CAPTION: Test cases for calling ~reachable?~ with equal ~start~ and ~stop~ values.
+#+NAME: test:start-eq-stop:reachable?.scm
+#+begin_src scheme
+  (define ngo-range:reachable? (@@ (ngo range) reachable?)) ; Get the unexported reachable? predicate
+
+  (test-assert "reachable? 0 0 0" (ngo-range:reachable? 0 0 0))
+  (test-assert "reachable? 0 0 1" (ngo-range:reachable? 0 0 1))
+  (test-assert "reachable? 0 0 -1" (ngo-range:reachable? 0 0 -1))
+
+  (test-assert "reachable? 1 1 0" (ngo-range:reachable? 1 1 0))
+  (test-assert "reachable? 1 1 1" (ngo-range:reachable? 1 1 1))
+  (test-assert "reachable? 1 1 -1" (ngo-range:reachable? 1 1 -1))
+
+  (test-assert "reachable? -1 -1 0" (ngo-range:reachable? -1 -1 0))
+  (test-assert "reachable? -1 -1 1" (ngo-range:reachable? -1 -1 1))
+  (test-assert "reachable? -1 -1 -1" (ngo-range:reachable? -1 -1 -1))
+#+end_src
+
+*** count
+
+When the ~start~ and ~stop~ are equal the ~count~ function should return ~0~.
+
+#+CAPTION: Test cases for calling ~count~ with equal ~start~ and ~stop~ values.
+#+NAME: test:start-eq-stop:count.scm
+#+begin_src scheme
+  (define ngo-range:count (@@ (ngo range) count)) ; Get the unexported count function
+
+  (define expected-val 0)
+
+  (test-equal "count 0 0 0" expected-val (ngo-range:count 0 0 0))
+  (test-equal "count 0 0 1" expected-val (ngo-range:count 0 0 1))
+  (test-equal "count 0 0 -1" expected-val (ngo-range:count 0 0 -1))
+
+  (test-equal "count 1 1 0" expected-val (ngo-range:count 1 1 0))
+  (test-equal "count 1 1 1" expected-val (ngo-range:count 1 1 1))
+  (test-equal "count 1 1 -1" expected-val (ngo-range:count 1 1 -1))
+
+  (test-equal "count -1 -1 0" expected-val (ngo-range:count -1 -1 0))
+  (test-equal "count -1 -1 1" expected-val (ngo-range:count -1 -1 1))
+  (test-equal "count -1 -1 -1" expected-val (ngo-range:count -1 -1 -1))
+#+end_src
+
+*** range
+
+When the ~start~ and ~stop~ are equal ~range~ should return an empty list.
+
+#+CAPTION: Test cases for calling ~range~ with equal ~start~ and ~stop~ values.
+#+NAME: test:start-eq-stop:range.scm
+#+begin_src scheme
   (define (test-util:start==stop start step)
     "Utility function to check range returns empty list when start=stop."
     (null? (range start start step)))
@@ -76,8 +163,6 @@ cases (~start=stop=0~, ~start=stop=1~ and ~start=stop=-1~; ~step=0,1,-1~).
   (test-assert "-1 0" (test-util:start==stop -1 0))
   (test-assert "-1 1" (test-util:start==stop -1 1))
   (test-assert "-1 -1" (test-util:start==stop -1 -1))
-
-  (test-end "start-eq-stop")
 #+end_src
 
 ** ~start /= stop~
